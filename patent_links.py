@@ -114,10 +114,15 @@ def add_links_to_workbook(
 
     for col, title in ((esp_col, "Espacenet"), (jpp_col, "J-PlatPat")):
         cell = ws.cell(row=header_row, column=col, value=title)
-        cell.font = copy(header_cell.font)
+        font = copy(header_cell.font)
+        font.name = "Meiryo UI"
+        font.sz = 10
+        cell.font = font
         cell.fill = copy(header_cell.fill)
         cell.border = copy(header_cell.border)
-        cell.alignment = copy(header_cell.alignment)
+        alignment = copy(header_cell.alignment)
+        alignment.vertical = "top"
+        cell.alignment = alignment
         ws.column_dimensions[cell.column_letter].width = 20
 
     for row in range(header_row + 1, ws.max_row + 1):
@@ -126,10 +131,17 @@ def add_links_to_workbook(
             (esp_col, espacenet_url(p), "Espacenet で開く"),
             (jpp_col, jplatpat_url(p), "J-PlatPat で開く"),
         ):
+            cell = ws.cell(row=row, column=col, value=label if url else None)
             if url:
-                cell = ws.cell(row=row, column=col, value=label)
                 cell.hyperlink = url
                 cell.style = "Hyperlink"
+            font = copy(cell.font)
+            font.name = "Meiryo UI"
+            font.sz = 10
+            cell.font = font
+            alignment = copy(cell.alignment)
+            alignment.vertical = "top"
+            cell.alignment = alignment
 
     out = BytesIO()
     wb.save(out)
