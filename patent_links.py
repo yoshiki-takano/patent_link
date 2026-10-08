@@ -117,6 +117,7 @@ def add_links_to_workbook(
         font = copy(header_cell.font)
         font.name = "Meiryo UI"
         font.sz = 10
+        font.scheme = None
         cell.font = font
         cell.fill = copy(header_cell.fill)
         cell.border = copy(header_cell.border)
@@ -138,6 +139,7 @@ def add_links_to_workbook(
             font = copy(cell.font)
             font.name = "Meiryo UI"
             font.sz = 10
+            font.scheme = None
             cell.font = font
             alignment = copy(cell.alignment)
             alignment.vertical = "top"
