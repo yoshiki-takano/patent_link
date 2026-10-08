@@ -5,6 +5,7 @@ from io import BytesIO
 from urllib.parse import quote
 
 from openpyxl import load_workbook
+from openpyxl.styles import Font
 
 ESPACENET_BASE = "https://worldwide.espacenet.com/patent/search?q=pn%3D"
 JPLATPAT_BASE = "https://www.j-platpat.inpit.go.jp/c1801/PU"
@@ -135,12 +136,12 @@ def add_links_to_workbook(
             cell = ws.cell(row=row, column=col, value=label if url else None)
             if url:
                 cell.hyperlink = url
-                cell.style = "Hyperlink"
-            font = copy(cell.font)
-            font.name = "Meiryo UI"
-            font.sz = 10
-            font.scheme = None
-            cell.font = font
+            cell.font = Font(
+                name="Meiryo UI",
+                size=10,
+                color="0563C1" if url else None,
+                underline="single" if url else None,
+            )
             alignment = copy(cell.alignment)
             alignment.vertical = "top"
             cell.alignment = alignment
