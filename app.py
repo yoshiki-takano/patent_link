@@ -9,12 +9,12 @@ from patent_links import add_links_to_workbook, build_links, parse_number
 st.set_page_config(page_title="公報番号リンク作成", page_icon=":material/link:", layout="wide")
 
 
-@st.cache_data(ttl="1h")
+@st.cache_data(ttl="1h", scope="session")
 def read_sheets(xlsx_bytes: bytes) -> dict[str, pd.DataFrame]:
     return pd.read_excel(BytesIO(xlsx_bytes), sheet_name=None, dtype=str)
 
 
-@st.cache_data(ttl="1h")
+@st.cache_data(ttl="1h", scope="session")
 def build_output(xlsx_bytes: bytes, sheet: str, column: str) -> bytes:
     return add_links_to_workbook(xlsx_bytes, sheet, column)
 
