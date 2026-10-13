@@ -9,6 +9,8 @@ from openpyxl.styles import Font
 
 ESPACENET_BASE = "https://worldwide.espacenet.com/patent/search?q=pn%3D"
 JPLATPAT_BASE = "https://www.j-platpat.inpit.go.jp/c1801/PU"
+# Other countries listed in J-PlatPat's 文献蓄積情報; IDs use a 9-digit zero-padded number.
+JPLATPAT_OTHER_COUNTRIES = {"GB", "DE", "DD", "FR", "CH", "CA"}
 
 _PATTERN = re.compile(r"^([A-Z]{2})(\d+)([A-Z]\d?)$")
 
@@ -72,6 +74,8 @@ def _jplatpat_foreign_id(p: PatentNumber) -> str | None:
             return f"KR-A-{n[2:4]}{n[4:].zfill(7)}"
         if kind == "B":
             return f"KR-B-{('10' + n) if len(n) == 7 else n}"
+    if p.country in JPLATPAT_OTHER_COUNTRIES:
+        return f"{p.country}-{kind}-{n.zfill(9)}"
     return None
 
 
