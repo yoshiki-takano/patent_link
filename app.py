@@ -36,7 +36,7 @@ def detect_header_row(rows: list[list[str | None]], max_rows: int = 20) -> int:
 
 
 st.title(":material/link: 公報番号リンク作成")
-st.caption("公報番号列から Espacenet / J-PlatPat へのリンク列を作成します。")
+st.caption("公報番号列から Espacenet / J-PlatPat へのリンク列を作成します。ただし、欠番、未蓄積、落丁の場合があります。")
 
 st.markdown(
     """
