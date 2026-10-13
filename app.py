@@ -119,9 +119,19 @@ st.dataframe(
     hide_index=True,
 )
 
+try:
+    output = build_output(data, sheet, col_idx + 1, header_row)
+except ValueError as e:
+    # Streamlit Cloud redacts exception text; openpyxl messages only contain row/column numbers.
+    st.error(
+        f"リンク付きExcelの作成に失敗しました（シート: {sheet}, 見出し行: {header_row!r}, "
+        f"列: {col_idx + 1!r}, 列数: {width}, 行数: {len(rows)}）: {e}"
+    )
+    st.stop()
+
 st.download_button(
     "リンク付きExcelをダウンロード",
-    data=build_output(data, sheet, col_idx + 1, header_row),
+    data=output,
     file_name=f"{Path(uploaded.name).stem}_with_links.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     icon=":material/download:",
