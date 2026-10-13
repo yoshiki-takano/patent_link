@@ -50,6 +50,9 @@ def espacenet_number(p: PatentNumber) -> str:
     elif p.country == "KR" and _is_granted(p) and len(number) == 7:
         # Source data drops the "10" prefix of KR registration numbers.
         number = "10" + number
+    elif p.country == "KR" and p.kind.startswith("A") and len(number) == 10:
+        # Source data drops a leading zero of the 7-digit serial: KR2026125202A -> KR20260125202A.
+        number = number[:4] + number[4:].zfill(7)
     elif p.country == "US" and p.kind.startswith("A") and len(number) == 11:
         # Espacenet (DOCDB) uses a 6-digit serial: US2016222235A1, not US20160222235A1.
         number = number[:4] + number[4:].lstrip("0").zfill(6)
