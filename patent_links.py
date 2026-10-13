@@ -38,6 +38,8 @@ def _is_granted(p: PatentNumber) -> bool:
 
 def espacenet_number(p: PatentNumber) -> str:
     number = p.number
+    if p.country == "DD":
+        return f"{p.country}{number}"
     if p.country == "JP" and _is_granted(p):
         number = number.lstrip("0")
     elif p.country == "KR" and _is_granted(p) and len(number) == 7:
