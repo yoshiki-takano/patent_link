@@ -101,19 +101,13 @@ def build_links(values) -> list[tuple[str | None, str | None]]:
 
 
 def add_links_to_workbook(
-    xlsx_bytes: bytes, sheet_name: str, column_name: str, header_row: int = 1
+    xlsx_bytes: bytes, sheet_name: str, src_col: int, header_row: int = 1
 ) -> bytes:
+    """src_col and header_row are 1-based."""
     wb = load_workbook(BytesIO(xlsx_bytes))
     ws = wb[sheet_name]
 
-    header_cell = next(
-        (c for c in ws[header_row] if c.value is not None and str(c.value).strip() == column_name),
-        None,
-    )
-    if header_cell is None:
-        raise ValueError(f"列「{column_name}」が見つかりません。")
-
-    src_col = header_cell.column
+    header_cell = ws.cell(row=header_row, column=src_col)
     esp_col = ws.max_column + 1
     jpp_col = esp_col + 1
 

@@ -4,19 +4,35 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+from openpyxl import load_workbook
+
 from patent_links import add_links_to_workbook, build_links, parse_number
 
 st.set_page_config(page_title="公報番号リンク作成", page_icon=":material/link:", layout="wide")
 
 
 @st.cache_data(ttl="1h", scope="session")
-def read_sheets(xlsx_bytes: bytes) -> dict[str, pd.DataFrame]:
-    return pd.read_excel(BytesIO(xlsx_bytes), sheet_name=None, dtype=str)
+def read_sheets(xlsx_bytes: bytes) -> dict[str, list[list[str | None]]]:
+    # Read raw rows (no header) so row numbers match Excel exactly.
+    wb = load_workbook(BytesIO(xlsx_bytes), read_only=True, data_only=True)
+    sheets = {
+        ws.title: [[None if v is None else str(v) for v in row] for row in ws.iter_rows(values_only=True)]
+        for ws in wb.worksheets
+    }
+    wb.close()
+    return sheets
 
 
 @st.cache_data(ttl="1h", scope="session")
-def build_output(xlsx_bytes: bytes, sheet: str, column: str) -> bytes:
-    return add_links_to_workbook(xlsx_bytes, sheet, column)
+def build_output(xlsx_bytes: bytes, sheet: str, src_col: int, header_row: int) -> bytes:
+    return add_links_to_workbook(xlsx_bytes, sheet, src_col, header_row)
+
+
+def detect_header_row(rows: list[list[str | None]], max_rows: int = 20) -> int:
+    for i, row in enumerate(rows[:max_rows], start=1):
+        if any(v is not None and v.strip() == "公報番号" for v in row):
+            return i
+    return 1
 
 
 st.title(":material/link: 公報番号リンク作成")
@@ -44,13 +60,37 @@ if uploaded is None:
 data = uploaded.getvalue()
 sheets = read_sheets(data)
 
-left, right = st.columns(2)
-sheet = left.selectbox("シート", list(sheets))
-df = sheets[sheet]
-columns = list(df.columns)
-column = right.selectbox(
-    "公報番号列", columns, index=columns.index("公報番号") if "公報番号" in columns else 0
+c1, c2, c3 = st.columns(3)
+sheet = c1.selectbox("シート", list(sheets))
+rows = sheets[sheet]
+if not rows:
+    st.warning("選択したシートにデータがありません。")
+    st.stop()
+
+header_row = c2.number_input(
+    "見出し行（Excelの行番号）",
+    min_value=1,
+    max_value=len(rows),
+    value=detect_header_row(rows),
+    key=f"header_row_{sheet}",
+    help="「公報番号」を含む行を自動で初期選択します。",
 )
+width = max(len(r) for r in rows)
+headers = rows[header_row - 1] + [None] * (width - len(rows[header_row - 1]))
+labels = [h.strip() if h and h.strip() else f"（無題）{i + 1}列目" for i, h in enumerate(headers)]
+col_idx = c3.selectbox(
+    "公報番号列",
+    range(width),
+    index=labels.index("公報番号") if "公報番号" in labels else 0,
+    format_func=lambda i: labels[i],
+    key=f"column_{sheet}_{header_row}",
+)
+column = labels[col_idx]
+
+values = pd.Series(
+    [r[col_idx] if col_idx < len(r) else None for r in rows[header_row:]], dtype=object
+)
+df = pd.DataFrame({column: values})
 
 links = build_links(df[column])
 result = pd.DataFrame(
@@ -81,7 +121,7 @@ st.dataframe(
 
 st.download_button(
     "リンク付きExcelをダウンロード",
-    data=build_output(data, sheet, column),
+    data=build_output(data, sheet, col_idx + 1, header_row),
     file_name=f"{Path(uploaded.name).stem}_with_links.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     icon=":material/download:",
