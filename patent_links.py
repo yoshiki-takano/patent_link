@@ -133,9 +133,9 @@ def add_links_to_workbook(
             (esp_col, espacenet_url(p), "Espacenet で開く"),
             (jpp_col, jplatpat_url(p), "J-PlatPat で開く"),
         ):
-            cell = ws.cell(row=row, column=col, value=label if url else None)
-            if url:
-                cell.hyperlink = url
+            # HYPERLINK formulas avoid Excel's 65,530 hyperlinks-per-sheet limit on large lists.
+            value = f'=HYPERLINK("{url}","{label}")' if url else None
+            cell = ws.cell(row=row, column=col, value=value)
             cell.font = Font(
                 name="Meiryo UI",
                 size=10,
@@ -146,6 +146,7 @@ def add_links_to_workbook(
             alignment.vertical = "top"
             cell.alignment = alignment
 
+    wb.calculation.fullCalcOnLoad = True
     out = BytesIO()
     wb.save(out)
     return out.getvalue()
