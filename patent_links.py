@@ -36,6 +36,11 @@ def _is_granted(p: PatentNumber) -> bool:
     return p.kind.startswith(("B", "C"))
 
 
+def _is_showa_examined(p: PatentNumber) -> bool:
+    # 特公昭 is YY+6 digits; JP registration numbers in this data start with 0.
+    return p.country == "JP" and p.kind.startswith("B") and len(p.number) == 8 and not p.number.startswith("0")
+
+
 def espacenet_number(p: PatentNumber) -> str:
     number = p.number
     if p.country == "DD":
@@ -54,6 +59,10 @@ def espacenet_number(p: PatentNumber) -> str:
 def espacenet_url(p: PatentNumber | None) -> str | None:
     if p is None:
         return None
+    if _is_showa_examined(p):
+        # DOCDB form is JPS4612531B1/B2; listing both kinds avoids matching the Y1 utility model.
+        base = f"JPS{p.number[:2]}{int(p.number[2:])}"
+        return ESPACENET_BASE + quote(f"{base}B1 OR pn={base}B2")
     return ESPACENET_BASE + quote(espacenet_number(p))
 
 
@@ -85,6 +94,9 @@ def jplatpat_url(p: PatentNumber | None) -> str | None:
     if p is None:
         return None
     if p.country == "JP":
+        n = p.number
+        if _is_showa_examined(p):
+            return f"{JPLATPAT_BASE}/JP-S{n[:2]}-{n[2:]}/12/ja"
         if _is_granted(p):
             return f"{JPLATPAT_BASE}/JP-{p.number.lstrip('0').zfill(7)}/15/ja"
         if p.kind.startswith("A") and len(p.number) == 10:
