@@ -55,6 +55,8 @@ def _normalize_korean_year_number(number: str) -> str:
 
 def _normalize_korean_grant_number(number: str) -> str:
     number = _normalize_korean_year_number(number)
+    if len(number) == 6:
+        return "100" + number
     if len(number) == 7:
         return "10" + number
     return number
