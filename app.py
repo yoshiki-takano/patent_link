@@ -1,3 +1,4 @@
+from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
 
@@ -24,7 +25,13 @@ def read_sheets(xlsx_bytes: bytes) -> dict[str, list[list[str | None]]]:
 
 
 @st.cache_data(ttl="1h", scope="session")
-def build_output(xlsx_bytes: bytes, sheet: str, src_col: int, header_row: int) -> bytes:
+def build_output(
+    xlsx_bytes: bytes,
+    sheet: str,
+    src_col: int,
+    header_row: int,
+    link_rules_signature: str,
+) -> bytes:
     return add_links_to_workbook(xlsx_bytes, sheet, src_col, header_row)
 
 
@@ -120,7 +127,8 @@ st.dataframe(
 )
 
 try:
-    output = build_output(data, sheet, col_idx + 1, header_row)
+    link_rules_signature = sha256(Path(__file__).with_name("patent_links.py").read_bytes()).hexdigest()
+    output = build_output(data, sheet, col_idx + 1, header_row, link_rules_signature)
 except ValueError as e:
     # Streamlit Cloud redacts exception text; openpyxl messages only contain row/column numbers.
     st.error(
