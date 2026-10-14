@@ -74,6 +74,8 @@ def espacenet_number(p: PatentNumber) -> str:
         number = number.lstrip("0")
     elif p.country == "KR" and _is_granted(p):
         number = _normalize_korean_grant_number(number)
+    elif p.country == "KR" and p.kind == "Y1" and len(number) == 6:
+        number = "200" + number
     elif p.country == "KR" and p.kind == "U":
         number = _normalize_korean_year_number(number)
     elif p.country == "KR" and p.kind.startswith("A") and len(number) == 10:
