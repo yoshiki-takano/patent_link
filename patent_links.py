@@ -154,7 +154,7 @@ def add_links_to_workbook(
             cell.font = Font(
                 name="Meiryo UI",
                 size=10,
-                color="0563C1" if url else None,
+                color="0000FF" if url else None,
                 underline="single" if url else None,
             )
             alignment = copy(cell.alignment)
