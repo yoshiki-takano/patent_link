@@ -114,6 +114,8 @@ def _jplatpat_foreign_id(p: PatentNumber) -> str | None:
         # J-PlatPat KR publication = 2-digit year + 7-digit serial.
         if kind == "A" and len(n) in (10, 11):
             return f"KR-A-{n[2:4]}{n[4:].zfill(7)}"
+        if kind == "Y" and len(n) == 6:
+            return f"KR-Y-200{n}"
         if kind == "U" and len(n) == 9:
             return f"KR-U-{_normalize_korean_year_number(n)}"
         if kind == "B":
