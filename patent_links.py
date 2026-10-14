@@ -114,6 +114,8 @@ def jplatpat_url(p: PatentNumber | None) -> str | None:
             return f"{JPLATPAT_BASE}/JP-S{n[:2]}-{n[2:]}/12/ja"
         if _is_granted(p):
             return f"{JPLATPAT_BASE}/JP-{p.number.lstrip('0').zfill(7)}/15/ja"
+        if p.kind == "U" and len(n) == 8:
+            return f"{JPLATPAT_BASE}/JP-{n.lstrip('0')}/25/ja"
         jp_a_parts = _japanese_a_publication_parts(p)
         if jp_a_parts:
             year, serial = jp_a_parts
