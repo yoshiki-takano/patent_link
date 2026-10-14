@@ -47,6 +47,14 @@ def _japanese_a_publication_parts(p: PatentNumber) -> tuple[str, str] | None:
     return p.number[:-6].zfill(2), p.number[-6:]
 
 
+def _normalize_korean_grant_number(number: str) -> str:
+    if len(number) == 11 and number.startswith("10"):
+        return number[4:6] + number[6:].zfill(7)
+    if len(number) == 7:
+        return "10" + number
+    return number
+
+
 def espacenet_number(p: PatentNumber) -> str:
     number = p.number
     if p.country == "DD":
@@ -59,9 +67,8 @@ def espacenet_number(p: PatentNumber) -> str:
         number = number.lstrip("0")
     elif p.country == "JP" and _is_granted(p):
         number = number.lstrip("0")
-    elif p.country == "KR" and _is_granted(p) and len(number) == 7:
-        # Source data drops the "10" prefix of KR registration numbers.
-        number = "10" + number
+    elif p.country == "KR" and _is_granted(p):
+        number = _normalize_korean_grant_number(number)
     elif p.country == "KR" and p.kind.startswith("A") and len(number) == 10:
         # Source data drops a leading zero of the 7-digit serial: KR2026125202A -> KR20260125202A.
         number = number[:4] + number[4:].zfill(7)
@@ -101,7 +108,7 @@ def _jplatpat_foreign_id(p: PatentNumber) -> str | None:
         if kind == "A" and len(n) in (10, 11):
             return f"KR-A-{n[2:4]}{n[4:].zfill(7)}"
         if kind == "B":
-            return f"KR-B-{('10' + n) if len(n) == 7 else n}"
+            return f"KR-B-{_normalize_korean_grant_number(n)}"
     if p.country in JPLATPAT_OTHER_COUNTRIES:
         return f"{p.country}-{kind}-{n.zfill(9)}"
     return None
