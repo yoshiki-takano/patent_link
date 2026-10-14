@@ -48,8 +48,8 @@ def _japanese_a_publication_parts(p: PatentNumber) -> tuple[str, str] | None:
 
 
 def _normalize_korean_grant_number(number: str) -> str:
-    if len(number) == 11 and number.startswith("10"):
-        return number[4:6] + number[6:].zfill(7)
+    if len(number) == 9 and number[:2] in ("19", "20"):
+        return number[2:4] + number[4:].zfill(7)
     if len(number) == 7:
         return "10" + number
     return number
