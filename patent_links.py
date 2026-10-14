@@ -41,11 +41,23 @@ def _is_showa_examined(p: PatentNumber) -> bool:
     return p.country == "JP" and p.kind.startswith("B") and len(p.number) == 8 and not p.number.startswith("0")
 
 
+def _japanese_a_publication_parts(p: PatentNumber) -> tuple[str, str] | None:
+    if p.country != "JP" or p.kind != "A" or len(p.number) not in (7, 8):
+        return None
+    return p.number[:-6].zfill(2), p.number[-6:]
+
+
 def espacenet_number(p: PatentNumber) -> str:
     number = p.number
     if p.country == "DD":
         return f"{p.country}{number}"
-    if p.country == "JP" and _is_granted(p):
+    jp_a_parts = _japanese_a_publication_parts(p)
+    if jp_a_parts:
+        year, serial = jp_a_parts
+        return f"JPH{year}{serial}{p.kind}"
+    if p.country == "JP" and p.kind == "U" and len(number) == 8:
+        number = number.lstrip("0")
+    elif p.country == "JP" and _is_granted(p):
         number = number.lstrip("0")
     elif p.country == "KR" and _is_granted(p) and len(number) == 7:
         # Source data drops the "10" prefix of KR registration numbers.
@@ -102,6 +114,10 @@ def jplatpat_url(p: PatentNumber | None) -> str | None:
             return f"{JPLATPAT_BASE}/JP-S{n[:2]}-{n[2:]}/12/ja"
         if _is_granted(p):
             return f"{JPLATPAT_BASE}/JP-{p.number.lstrip('0').zfill(7)}/15/ja"
+        jp_a_parts = _japanese_a_publication_parts(p)
+        if jp_a_parts:
+            year, serial = jp_a_parts
+            return f"{JPLATPAT_BASE}/JP-H{year}-{serial}/11/ja"
         if p.kind.startswith("A") and len(p.number) == 10:
             return f"{JPLATPAT_BASE}/JP-{p.number[:4]}-{p.number[4:]}/11/ja"
         return None
