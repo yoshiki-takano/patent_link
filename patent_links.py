@@ -55,10 +55,8 @@ def _normalize_korean_year_number(number: str) -> str:
 
 def _normalize_korean_grant_number(number: str) -> str:
     number = _normalize_korean_year_number(number)
-    if len(number) == 6:
-        return "100" + number
-    if len(number) == 7:
-        return "10" + number
+    if len(number) <= 7:
+        return "10" + number.zfill(7)
     return number
 
 
@@ -124,6 +122,9 @@ def _jplatpat_foreign_id(p: PatentNumber) -> str | None:
             return f"KR-Y-200{n}"
         if kind == "U" and len(n) == 9:
             return f"KR-U-{_normalize_korean_year_number(n)}"
+        if kind == "B" and len(n) <= 5:
+            # J-PlatPat stores short KR grant numbers without the "10" right code.
+            return f"KR-B-{n.zfill(9)}"
         if kind == "B":
             return f"KR-B-{_normalize_korean_grant_number(n)}"
     if p.country in JPLATPAT_OTHER_COUNTRIES:
