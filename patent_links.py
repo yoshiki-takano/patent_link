@@ -11,6 +11,9 @@ ESPACENET_BASE = "https://worldwide.espacenet.com/patent/search?q=pn%3D"
 JPLATPAT_BASE = "https://www.j-platpat.inpit.go.jp/c1801/PU"
 # Other countries listed in J-PlatPat's 文献蓄積情報; IDs use a 9-digit zero-padded number.
 JPLATPAT_OTHER_COUNTRIES = {"GB", "DE", "DD", "FR", "CH", "CA"}
+# Last 6-digit KR numbers Espacenet stores in the old "0"+6-digit form (verified on Espacenet).
+KR_OLD_GRANT_MAX = 186214
+KR_OLD_UTILITY_MAX = 140846
 
 _PATTERN = re.compile(r"^([A-Z]{2})(\d+)([A-Z]\d?)$")
 
@@ -55,8 +58,13 @@ def _normalize_korean_year_number(number: str) -> str:
 
 def _normalize_korean_grant_number(number: str) -> str:
     number = _normalize_korean_year_number(number)
-    if len(number) <= 7:
-        return "10" + number.zfill(7)
+    if len(number) <= 5:
+        # Only KR13B1 exists; Espacenet lists it as KR1000013B1.
+        return "1" + number.zfill(6)
+    if len(number) == 6:
+        return ("0" if int(number) <= KR_OLD_GRANT_MAX else "100") + number
+    if len(number) == 7:
+        return "10" + number
     return number
 
 
@@ -75,7 +83,7 @@ def espacenet_number(p: PatentNumber) -> str:
     elif p.country == "KR" and _is_granted(p):
         number = _normalize_korean_grant_number(number)
     elif p.country == "KR" and p.kind == "Y1" and len(number) == 6:
-        number = "200" + number
+        number = ("0" if int(number) <= KR_OLD_UTILITY_MAX else "200") + number
     elif p.country == "KR" and p.kind == "U":
         number = _normalize_korean_year_number(number)
     elif p.country == "KR" and p.kind.startswith("A") and len(number) == 10:
@@ -119,14 +127,13 @@ def _jplatpat_foreign_id(p: PatentNumber) -> str | None:
         if kind == "A" and len(n) in (10, 11):
             return f"KR-A-{n[2:4]}{n[4:].zfill(7)}"
         if kind == "Y" and len(n) == 6:
-            return f"KR-Y-200{n}"
+            return f"KR-Y-{n.zfill(9)}"
         if kind == "U" and len(n) == 9:
             return f"KR-U-{_normalize_korean_year_number(n)}"
-        if kind == "B" and len(n) <= 5:
-            # J-PlatPat stores short KR grant numbers without the "10" right code.
-            return f"KR-B-{n.zfill(9)}"
         if kind == "B":
-            return f"KR-B-{_normalize_korean_grant_number(n)}"
+            n = _normalize_korean_year_number(n)
+            # J-PlatPat accepts zero-padded grant numbers without the "10" right code.
+            return f"KR-B-{n.zfill(9) if len(n) <= 7 else n}"
     if p.country in JPLATPAT_OTHER_COUNTRIES:
         return f"{p.country}-{kind}-{n.zfill(9)}"
     return None
