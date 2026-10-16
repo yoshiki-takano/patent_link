@@ -89,6 +89,8 @@ def espacenet_number(p: PatentNumber) -> str:
     elif p.country == "KR" and p.kind.startswith("A") and len(number) == 10:
         # Source data drops a leading zero of the 7-digit serial: KR2026125202A -> KR20260125202A.
         number = number[:4] + number[4:].zfill(7)
+    elif p.country == "EP" and p.kind in ("A1", "A2") and len(number) in (4, 5):
+        number = number.zfill(7)
     elif p.country == "CN" and p.kind == "A" and len(number) == 10 and number[:2] in ("19", "20"):
         number = number[2:]
     elif p.country == "US" and p.kind.startswith("A") and len(number) == 11:
