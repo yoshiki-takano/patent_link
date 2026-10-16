@@ -84,8 +84,8 @@ def espacenet_number(p: PatentNumber) -> str:
         number = _normalize_korean_grant_number(number)
     elif p.country == "KR" and p.kind == "Y1" and len(number) == 6:
         number = ("0" if int(number) <= KR_OLD_UTILITY_MAX else "200") + number
-    elif p.country == "KR" and p.kind == "U":
-        number = _normalize_korean_year_number(number)
+    elif p.country == "KR" and p.kind == "U" and len(number) == 9 and number[:2] in ("19", "20"):
+        number = number[:4] + number[4:].zfill(7)
     elif p.country == "KR" and p.kind.startswith("A") and len(number) == 10:
         # Source data drops a leading zero of the 7-digit serial: KR2026125202A -> KR20260125202A.
         number = number[:4] + number[4:].zfill(7)
