@@ -150,6 +150,8 @@ def jplatpat_url(p: PatentNumber | None) -> str | None:
         n = p.number
         if _is_showa_examined(p):
             return f"{JPLATPAT_BASE}/JP-S{n[:2]}-{n[2:]}/12/ja"
+        if p.kind == "B2" and len(n) == 7:
+            return f"{JPLATPAT_BASE}/JP-H0{n[0]}-{n[1:]}/12/ja"
         if _is_granted(p):
             return f"{JPLATPAT_BASE}/JP-{p.number.lstrip('0').zfill(7)}/15/ja"
         if p.kind == "U" and len(n) == 8:
