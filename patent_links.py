@@ -122,6 +122,8 @@ def _jplatpat_foreign_id(p: PatentNumber) -> str | None:
             return f"US-B-{n.zfill(9)}"
     if p.country == "EP" and kind in "AB":
         return f"EP-{kind}-{n.zfill(8)}"
+    if p.country == "CN" and kind == "A" and len(n) == 10 and n[:2] in ("19", "20"):
+        return f"CN-A-0{n[2:]}"
     if p.country == "CN" and kind in "ABCUY":
         return f"CN-{kind}-{n}"
     if p.country == "KR":
