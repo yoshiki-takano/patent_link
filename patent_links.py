@@ -75,6 +75,8 @@ def espacenet_number(p: PatentNumber) -> str:
     jp_a_parts = _japanese_a_publication_parts(p)
     if jp_a_parts:
         year, serial = jp_a_parts
+        if len(number) == 7 and number.startswith("80"):
+            serial = serial.lstrip("0")
         return f"JPH{year}{serial}{p.kind}"
     if p.country == "JP" and p.kind == "U" and len(number) == 8:
         number = number.lstrip("0")
