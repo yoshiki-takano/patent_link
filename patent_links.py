@@ -95,7 +95,8 @@ def espacenet_number(p: PatentNumber) -> str:
         number = number[2:]
     elif p.country == "US" and p.kind.startswith("A") and len(number) == 11:
         # Espacenet (DOCDB) uses a 6-digit serial: US2016222235A1, not US20160222235A1.
-        number = number[:4] + number[4:].lstrip("0").zfill(6)
+        if not (p.kind == "A1" and number[:4] >= "2024"):
+            number = number[:4] + number[4:].lstrip("0").zfill(6)
     return f"{p.country}{number}{p.kind}"
 
 
