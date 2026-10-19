@@ -108,9 +108,8 @@ def espacenet_url(p: PatentNumber | None) -> str | None:
     if p is None:
         return None
     if _is_showa_examined(p):
-        # DOCDB form is JPS4612531B1/B2; listing both kinds avoids matching the Y1 utility model.
         base = f"JPS{p.number[:2]}{int(p.number[2:])}"
-        return ESPACENET_BASE + quote(f"{base}B1 OR pn={base}B2")
+        return ESPACENET_BASE + quote(f"{base}B")
     return ESPACENET_BASE + quote(espacenet_number(p))
 
 
