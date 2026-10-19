@@ -14,6 +14,7 @@ JPLATPAT_OTHER_COUNTRIES = {"GB", "DE", "DD", "FR", "CH", "CA"}
 # Last 6-digit KR numbers Espacenet stores in the old "0"+6-digit form (verified on Espacenet).
 KR_OLD_GRANT_MAX = 186214
 KR_OLD_UTILITY_MAX = 140846
+JP_LAST_S64_EXAMINED = 12440
 
 _PATTERN = re.compile(r"^([A-Z]{2})(\d+)([A-Z]\d?)$")
 
@@ -39,9 +40,17 @@ def _is_granted(p: PatentNumber) -> bool:
     return p.kind.startswith(("B", "C"))
 
 
-def _is_showa_examined(p: PatentNumber) -> bool:
-    # 特公昭 is YY+6 digits; JP registration numbers in this data start with 0.
-    return p.country == "JP" and p.kind.startswith("B") and len(p.number) == 8 and not p.number.startswith("0")
+def _japanese_examined_parts(p: PatentNumber) -> tuple[str, str, str] | None:
+    if p.country != "JP" or p.number.startswith("0"):
+        return None
+    if len(p.number) == 8 and p.kind.startswith("B"):
+        return "S", p.number[:2], p.number[2:]
+    if len(p.number) == 7 and p.kind in ("B1", "B2"):
+        year, serial = p.number[0], p.number[1:]
+        if year == "1" and int(serial) <= JP_LAST_S64_EXAMINED:
+            return "S", "64", serial
+        return "H", f"0{year}", serial
+    return None
 
 
 def _japanese_a_publication_parts(p: PatentNumber) -> tuple[str, str] | None:
@@ -107,9 +116,10 @@ def espacenet_number(p: PatentNumber) -> str:
 def espacenet_url(p: PatentNumber | None) -> str | None:
     if p is None:
         return None
-    if _is_showa_examined(p):
-        base = f"JPS{p.number[:2]}{int(p.number[2:])}"
-        return ESPACENET_BASE + quote(f"{base}B")
+    examined_parts = _japanese_examined_parts(p)
+    if examined_parts:
+        era, year, serial = examined_parts
+        return ESPACENET_BASE + quote(f"JP{era}{year}{serial.lstrip('0') or '0'}{p.kind}")
     return ESPACENET_BASE + quote(espacenet_number(p))
 
 
@@ -156,10 +166,13 @@ def jplatpat_url(p: PatentNumber | None) -> str | None:
         return None
     if p.country == "JP":
         n = p.number
-        if _is_showa_examined(p):
-            return f"{JPLATPAT_BASE}/JP-S{n[:2]}-{n[2:]}/12/ja"
-        if p.kind == "B2" and len(n) == 7:
-            return f"{JPLATPAT_BASE}/JP-H0{n[0]}-{n[1:]}/12/ja"
+        if len(n) == 7 and not n.startswith("0") and p.kind in ("B1", "B2"):
+            examined_parts = ("H", f"0{n[0]}", n[1:])
+        else:
+            examined_parts = _japanese_examined_parts(p)
+        if examined_parts:
+            era, year, serial = examined_parts
+            return f"{JPLATPAT_BASE}/JP-{era}{year}-{serial}/12/ja"
         if _is_granted(p):
             return f"{JPLATPAT_BASE}/JP-{p.number.lstrip('0').zfill(7)}/15/ja"
         if p.kind == "U" and len(n) == 8:
