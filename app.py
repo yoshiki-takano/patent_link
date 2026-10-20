@@ -87,7 +87,7 @@ def detect_header_row(rows: list[list[str | None]], max_rows: int = 20) -> int:
 
 
 st.title(":material/link: 公報番号リンク作成")
-st.caption("公報番号から Espacenet / J-PlatPat へのリンクを作成します。ただし、欠番、未蓄積、落丁の場合があります。")
+st.caption("Derwent Patent Searchの公報番号から Espacenet / J-PlatPat へのリンクを作成します。ただし、欠番、未蓄積、落丁の場合があります。")
 
 st.markdown(
     """
@@ -109,7 +109,7 @@ link_rules_signature = sha256(Path(__file__).with_name("patent_links.py").read_b
 
 if input_mode == "直接入力":
     raw_numbers = st.text_area(
-        "公報番号（1行に1件）",
+        "DPS公報番号（1行に1件）",
         placeholder="JP2020123456A\nUS10123456B2",
         height=200,
     )
