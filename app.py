@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from openpyxl import load_workbook
+from openpyxl import Workbook, load_workbook
 
 from patent_links import add_links_to_workbook, build_links, parse_number
 
@@ -35,6 +35,50 @@ def build_output(
     return add_links_to_workbook(xlsx_bytes, sheet, src_col, header_row)
 
 
+@st.cache_data(ttl="1h", scope="session")
+def build_text_output(numbers: tuple[str, ...], link_rules_signature: str) -> bytes:
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "公報番号"
+    ws.cell(row=1, column=1, value="公報番号")
+    for row, number in enumerate(numbers, start=2):
+        ws.cell(row=row, column=1, value=number)
+
+    xlsx_buffer = BytesIO()
+    wb.save(xlsx_buffer)
+    wb.close()
+    return add_links_to_workbook(xlsx_buffer.getvalue(), ws.title, 1, 1)
+
+
+def show_result(values: pd.Series, column: str) -> None:
+    links = build_links(values)
+    result = pd.DataFrame(
+        {
+            column: values,
+            "Espacenet": [espacenet for espacenet, _ in links],
+            "J-PlatPat": [jplatpat for _, jplatpat in links],
+        }
+    )
+
+    total = int(values.notna().sum())
+    unparsed = int(sum(v is not None and not pd.isna(v) and parse_number(v) is None for v in values))
+    no_jpp = int(result["J-PlatPat"].isna().sum() - values.isna().sum() - unparsed)
+
+    m1, m2, m3 = st.columns(3)
+    m1.metric("公報番号", total, border=True)
+    m2.metric("解析失敗", unparsed, border=True)
+    m3.metric("J-PlatPat 未対応", no_jpp, border=True)
+
+    st.dataframe(
+        result,
+        column_config={
+            "Espacenet": st.column_config.LinkColumn("Espacenet", display_text="Espacenet で開く"),
+            "J-PlatPat": st.column_config.LinkColumn("J-PlatPat", display_text="J-PlatPat で開く"),
+        },
+        hide_index=True,
+    )
+
+
 def detect_header_row(rows: list[list[str | None]], max_rows: int = 20) -> int:
     for i, row in enumerate(rows[:max_rows], start=1):
         if any(v is not None and v.strip() == "公報番号" for v in row):
@@ -43,7 +87,7 @@ def detect_header_row(rows: list[list[str | None]], max_rows: int = 20) -> int:
 
 
 st.title(":material/link: 公報番号リンク作成")
-st.caption("公報番号列から Espacenet / J-PlatPat へのリンク列を作成します。ただし、欠番、未蓄積、落丁の場合があります。")
+st.caption("公報番号から Espacenet / J-PlatPat へのリンクを作成します。ただし、欠番、未蓄積、落丁の場合があります。")
 
 st.markdown(
     """
@@ -60,88 +104,86 @@ st.markdown(
 """
 )
 
-uploaded = st.file_uploader("Excelファイル (.xlsx)", type=["xlsx"])
-if uploaded is None:
-    st.stop()
+input_mode = st.segmented_control("入力方法", ["Excelファイル", "直接入力"], default="Excelファイル")
+link_rules_signature = sha256(Path(__file__).with_name("patent_links.py").read_bytes()).hexdigest()
 
-data = uploaded.getvalue()
-sheets = read_sheets(data)
-
-c1, c2, c3 = st.columns(3)
-sheet = c1.selectbox("シート", list(sheets))
-rows = sheets[sheet]
-if not rows:
-    st.warning("選択したシートにデータがありません。")
-    st.stop()
-
-header_row = c2.number_input(
-    "見出し行（Excelの行番号）",
-    min_value=1,
-    max_value=len(rows),
-    value=detect_header_row(rows),
-    key=f"header_row_{sheet}",
-    help="「公報番号」を含む行を自動で初期選択します。",
-)
-width = max(len(r) for r in rows)
-headers = rows[header_row - 1] + [None] * (width - len(rows[header_row - 1]))
-labels = [h.strip() if h and h.strip() else f"（無題）{i + 1}列目" for i, h in enumerate(headers)]
-col_idx = c3.selectbox(
-    "公報番号列",
-    range(width),
-    index=labels.index("公報番号") if "公報番号" in labels else 0,
-    format_func=lambda i: labels[i],
-    key=f"column_{sheet}_{header_row}",
-)
-column = labels[col_idx]
-
-values = pd.Series(
-    [r[col_idx] if col_idx < len(r) else None for r in rows[header_row:]], dtype=object
-)
-df = pd.DataFrame({column: values})
-
-links = build_links(df[column])
-result = pd.DataFrame(
-    {
-        column: df[column],
-        "Espacenet": [e for e, _ in links],
-        "J-PlatPat": [j for _, j in links],
-    }
-)
-
-total = int(df[column].notna().sum())
-unparsed = int(sum(v is not None and not pd.isna(v) and parse_number(v) is None for v in df[column]))
-no_jpp = int(result["J-PlatPat"].isna().sum() - df[column].isna().sum() - unparsed)
-
-m1, m2, m3 = st.columns(3)
-m1.metric("公報番号", total, border=True)
-m2.metric("解析失敗", unparsed, border=True)
-m3.metric("J-PlatPat 未対応", no_jpp, border=True)
-
-st.dataframe(
-    result,
-    column_config={
-        "Espacenet": st.column_config.LinkColumn("Espacenet", display_text="Espacenet で開く"),
-        "J-PlatPat": st.column_config.LinkColumn("J-PlatPat", display_text="J-PlatPat で開く"),
-    },
-    hide_index=True,
-)
-
-try:
-    link_rules_signature = sha256(Path(__file__).with_name("patent_links.py").read_bytes()).hexdigest()
-    output = build_output(data, sheet, col_idx + 1, header_row, link_rules_signature)
-except ValueError as e:
-    # Streamlit Cloud redacts exception text; openpyxl messages only contain row/column numbers.
-    st.error(
-        f"リンク付きExcelの作成に失敗しました（シート: {sheet}, 見出し行: {header_row!r}, "
-        f"列: {col_idx + 1!r}, 列数: {width}, 行数: {len(rows)}）: {e}"
+if input_mode == "直接入力":
+    raw_numbers = st.text_area(
+        "公報番号（1行に1件）",
+        placeholder="JP2020123456A\nUS10123456B2",
+        height=200,
     )
-    st.stop()
+    numbers = tuple(line.strip() for line in raw_numbers.splitlines() if line.strip())
+    if not numbers:
+        st.info("公報番号を1行に1件ずつ入力してください。")
+        st.stop()
 
-st.download_button(
-    "リンク付きExcelをダウンロード",
-    data=output,
-    file_name=f"{Path(uploaded.name).stem}_with_links.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    icon=":material/download:",
-    type="primary",
-)
+    values = pd.Series(numbers, dtype=object)
+    show_result(values, "公報番号")
+    output = build_text_output(numbers, link_rules_signature)
+    st.download_button(
+        "リンク付きExcelをダウンロード",
+        data=output,
+        file_name="公報番号_with_links.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        icon=":material/download:",
+        type="primary",
+    )
+else:
+    uploaded = st.file_uploader("Excelファイル (.xlsx)", type=["xlsx"])
+    if uploaded is None:
+        st.stop()
+
+    data = uploaded.getvalue()
+    sheets = read_sheets(data)
+
+    c1, c2, c3 = st.columns(3)
+    sheet = c1.selectbox("シート", list(sheets))
+    rows = sheets[sheet]
+    if not rows:
+        st.warning("選択したシートにデータがありません。")
+        st.stop()
+
+    header_row = c2.number_input(
+        "見出し行（Excelの行番号）",
+        min_value=1,
+        max_value=len(rows),
+        value=detect_header_row(rows),
+        key=f"header_row_{sheet}",
+        help="「公報番号」を含む行を自動で初期選択します。",
+    )
+    width = max(len(r) for r in rows)
+    headers = rows[header_row - 1] + [None] * (width - len(rows[header_row - 1]))
+    labels = [h.strip() if h and h.strip() else f"（無題）{i + 1}列目" for i, h in enumerate(headers)]
+    col_idx = c3.selectbox(
+        "公報番号列",
+        range(width),
+        index=labels.index("公報番号") if "公報番号" in labels else 0,
+        format_func=lambda i: labels[i],
+        key=f"column_{sheet}_{header_row}",
+    )
+    column = labels[col_idx]
+
+    values = pd.Series(
+        [r[col_idx] if col_idx < len(r) else None for r in rows[header_row:]], dtype=object
+    )
+    show_result(values, column)
+
+    try:
+        output = build_output(data, sheet, col_idx + 1, header_row, link_rules_signature)
+    except ValueError as e:
+        # Streamlit Cloud redacts exception text; openpyxl messages only contain row/column numbers.
+        st.error(
+            f"リンク付きExcelの作成に失敗しました（シート: {sheet}, 見出し行: {header_row!r}, "
+            f"列: {col_idx + 1!r}, 列数: {width}, 行数: {len(rows)}）: {e}"
+        )
+        st.stop()
+
+    st.download_button(
+        "リンク付きExcelをダウンロード",
+        data=output,
+        file_name=f"{Path(uploaded.name).stem}_with_links.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        icon=":material/download:",
+        type="primary",
+    )
