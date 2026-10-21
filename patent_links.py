@@ -14,7 +14,15 @@ JPLATPAT_OTHER_COUNTRIES = {"GB", "DE", "DD", "FR", "CH", "CA"}
 # Last 6-digit KR numbers Espacenet stores in the old "0"+6-digit form (verified on Espacenet).
 KR_OLD_GRANT_MAX = 186214
 KR_OLD_UTILITY_MAX = 140846
-JP_LAST_S64_EXAMINED = 12440
+# Last S64 serial per (kind group, 5xxxxx series); source data may write S64 numbers with year "1".
+JP_LAST_S64 = {
+    ("A", False): 91300,
+    ("A", True): 500558,
+    ("B", False): 12440,
+    ("Y", False): 7600,
+    ("U", False): 57700,
+    ("U", True): 500004,
+}
 
 _PATTERN = re.compile(r"^([A-Z]{2})(\d+)([A-Z]\d?)$")
 
@@ -40,23 +48,26 @@ def _is_granted(p: PatentNumber) -> bool:
     return p.kind.startswith(("B", "C"))
 
 
-def _japanese_examined_parts(p: PatentNumber) -> tuple[str, str, str] | None:
-    if p.country != "JP" or p.number.startswith("0"):
+def _japanese_era_parts(p: PatentNumber) -> tuple[str, str, str] | None:
+    """Return (era, 2-digit year, 6-digit serial) for Showa/Heisei A, B, Y and U numbers."""
+    n = p.number
+    if p.country != "JP" or n.startswith("0") or len(n) not in (7, 8):
         return None
-    if len(p.number) == 8 and p.kind.startswith("B"):
-        return "S", p.number[:2], p.number[2:]
-    if len(p.number) == 7 and p.kind in ("B1", "B2"):
-        year, serial = p.number[0], p.number[1:]
-        if year == "1" and int(serial) <= JP_LAST_S64_EXAMINED:
+    group = p.kind[0]
+    if group == "B":
+        if len(n) == 7 and p.kind not in ("B1", "B2"):
+            return None
+    elif p.kind not in ("A", "U", "Y", "Y1", "Y2"):
+        return None
+    if len(n) == 7:
+        year, serial = n[0], n[1:]
+        if year == "1" and int(serial) <= JP_LAST_S64.get((group, serial.startswith("5")), 0):
             return "S", "64", serial
         return "H", f"0{year}", serial
-    return None
-
-
-def _japanese_a_publication_parts(p: PatentNumber) -> tuple[str, str] | None:
-    if p.country != "JP" or p.kind != "A" or len(p.number) not in (7, 8):
-        return None
-    return p.number[:-6].zfill(2), p.number[-6:]
+    year, serial = n[:2], n[2:]
+    if group == "A" and year in ("10", "11"):
+        return "H", year, serial
+    return "S", year, serial
 
 
 def _normalize_korean_year_number(number: str) -> str:
@@ -81,14 +92,10 @@ def espacenet_number(p: PatentNumber) -> str:
     number = p.number
     if p.country == "DD":
         return f"{p.country}{number}"
-    jp_a_parts = _japanese_a_publication_parts(p)
-    if jp_a_parts:
-        year, serial = jp_a_parts
-        if len(number) == 7:
-            serial = serial.lstrip("0")
-            if year == "01":
-                return f"JPS64{serial}{p.kind}"
-        return f"JPH{year}{serial}{p.kind}"
+    era_parts = _japanese_era_parts(p)
+    if era_parts:
+        era, year, serial = era_parts
+        return f"JP{era}{year}{serial.lstrip('0') or '0'}{p.kind}"
     if p.country == "JP" and p.kind == "U" and len(number) == 8:
         number = number.lstrip("0")
     elif p.country == "JP" and _is_granted(p):
@@ -116,10 +123,6 @@ def espacenet_number(p: PatentNumber) -> str:
 def espacenet_url(p: PatentNumber | None) -> str | None:
     if p is None:
         return None
-    examined_parts = _japanese_examined_parts(p)
-    if examined_parts:
-        era, year, serial = examined_parts
-        return ESPACENET_BASE + quote(f"JP{era}{year}{serial.lstrip('0') or '0'}{p.kind}")
     return ESPACENET_BASE + quote(espacenet_number(p))
 
 
@@ -166,21 +169,22 @@ def jplatpat_url(p: PatentNumber | None) -> str | None:
         return None
     if p.country == "JP":
         n = p.number
-        if len(n) == 7 and not n.startswith("0") and p.kind in ("B1", "B2"):
-            examined_parts = ("H", f"0{n[0]}", n[1:])
-        else:
-            examined_parts = _japanese_examined_parts(p)
-        if examined_parts:
-            era, year, serial = examined_parts
-            return f"{JPLATPAT_BASE}/JP-{era}{year}-{serial}/12/ja"
+        era_parts = _japanese_era_parts(p)
+        if era_parts:
+            era, year, serial = era_parts
+            if (era, year) == ("S", "64"):
+                # J-PlatPat files all 1989 documents under H01.
+                era, year = "H", "01"
+            group = p.kind[0]
+            if group == "U":
+                code = "21" if serial.startswith("5") else "23"
+            else:
+                code = {"A": "11", "B": "12", "Y": "22"}[group]
+            return f"{JPLATPAT_BASE}/JP-{era}{year}-{serial}/{code}/ja"
         if _is_granted(p):
             return f"{JPLATPAT_BASE}/JP-{p.number.lstrip('0').zfill(7)}/15/ja"
         if p.kind == "U" and len(n) == 8:
             return f"{JPLATPAT_BASE}/JP-{n.lstrip('0')}/25/ja"
-        jp_a_parts = _japanese_a_publication_parts(p)
-        if jp_a_parts:
-            year, serial = jp_a_parts
-            return f"{JPLATPAT_BASE}/JP-H{year}-{serial}/11/ja"
         if p.kind.startswith("A") and len(p.number) == 10:
             return f"{JPLATPAT_BASE}/JP-{p.number[:4]}-{p.number[4:]}/11/ja"
         return None
