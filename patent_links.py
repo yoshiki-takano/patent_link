@@ -96,6 +96,9 @@ def espacenet_number(p: PatentNumber) -> str:
     if era_parts:
         era, year, serial = era_parts
         return f"JP{era}{year}{serial.lstrip('0') or '0'}{p.kind}"
+    if p.country == "JP" and p.kind == "A1" and len(number) == 10:
+        # JP A1 = 再公表特許 (domestic re-publication of a WO application).
+        return f"JPWO{number}{p.kind}"
     if p.country == "JP" and p.kind == "U" and len(number) == 8:
         number = number.lstrip("0")
     elif p.country == "JP" and _is_granted(p):
@@ -185,6 +188,8 @@ def jplatpat_url(p: PatentNumber | None) -> str | None:
             return f"{JPLATPAT_BASE}/JP-{p.number.lstrip('0').zfill(7)}/15/ja"
         if p.kind == "U" and len(n) == 8:
             return f"{JPLATPAT_BASE}/JP-{n.lstrip('0')}/25/ja"
+        if p.kind == "A1" and len(n) == 10:
+            return f"{JPLATPAT_BASE}/JP-{n[:4]}-{n[4:]}/19/ja"
         if p.kind.startswith("A") and len(p.number) == 10:
             return f"{JPLATPAT_BASE}/JP-{p.number[:4]}-{p.number[4:]}/11/ja"
         return None
