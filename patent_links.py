@@ -100,8 +100,8 @@ def espacenet_number(p: PatentNumber) -> str:
     if era_parts:
         era, year, serial = era_parts
         return f"JP{era}{year}{serial.lstrip('0') or '0'}{p.kind}"
-    if p.country == "JP" and p.kind == "A1" and len(number) == 10:
-        # JP A1 = 再公表特許 (domestic re-publication of a WO application).
+    if p.country == "JP" and p.kind == "A1" and len(number) == 10 and number[:4] > "2002":
+        # JP A1 = 再公表特許; Espacenet uses JPWO only from 2003, earlier ones stay JP.
         return f"JPWO{number}{p.kind}"
     if p.country == "JP" and p.kind == "U" and len(number) == 8:
         number = number.lstrip("0")
