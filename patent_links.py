@@ -23,6 +23,39 @@ JP_LAST_S64 = {
     ("U", False): 57700,
     ("U", True): 500004,
 }
+# Oldest documents in J-PlatPat 文献蓄積情報 (2026-10) per (country, kind letter, digit count or None for any).
+# Only lower bounds are checked because newer documents keep being added.
+# KR year-format numbers are compared as 4-digit year + 7-digit serial under digit count "year".
+JPLATPAT_OLDEST = {
+    ("US", "A", 11): 20010000001,
+    ("US", "B", None): 6167569,
+    ("CN", "A", 10): 1985100001,
+    ("CN", "A", 7): 1030001,
+    ("CN", "A", 9): 100998275,
+    ("CN", "B", 10): 1985100001,
+    ("CN", "B", 7): 1003001,
+    ("CN", "B", 9): 100998281,
+    ("CN", "C", 7): 1019873,
+    ("CN", "C", 9): 100333628,
+    ("CN", "U", 9): 201435903,
+    ("CN", "Y", 7): 2528190,
+    ("CN", "Y", 9): 200938735,
+    ("KR", "A", "year"): 19980013594,
+    ("KR", "B", "year"): 19790000805,
+    ("KR", "U", "year"): 19980010093,
+    ("KR", "Y", None): 106898,
+    ("GB", "A", None): 100001,
+    ("DE", "A", None): 1400003,
+    ("DE", "B", None): 1000001,
+    ("DE", "C", None): 20,
+    ("DE", "U", None): 160919,
+    ("CH", "B", None): 559256,
+    ("CA", "A", None): 198802,
+    ("CA", "C", None): 1275202,
+}
+# Kind letters J-PlatPat stores for the other countries; DPS kinds don't map 1:1, so only the letter is checked.
+JPLATPAT_STORED_KINDS = {"GB": "A", "DE": "ABCU", "DD": "ABCTU", "FR": "A", "CH": "AB", "CA": "AC"}
+JPLATPAT_NOTE = "蓄積範囲外の可能性"
 
 _PATTERN = re.compile(r"^([A-Z]{2})(\d+)([A-Z]\d?)$")
 
@@ -202,6 +235,43 @@ def jplatpat_url(p: PatentNumber | None) -> str | None:
     return f"{JPLATPAT_BASE}/{doc_id}/50/ja" if doc_id else None
 
 
+def _jp_may_be_missing(p: PatentNumber) -> bool:
+    n = p.number
+    era_parts = _japanese_era_parts(p)
+    if era_parts:
+        era, year, serial = era_parts
+        if era != "S" or p.kind[0] not in "AU":
+            return False
+        # 公開 starts at S46, 公表 (5xxxxx serials) at S54.
+        return int(year) < (54 if serial.startswith("5") else 46)
+    if p.kind.startswith("B"):
+        return int(n) < 2500001
+    if p.kind == "U" and len(n) == 8:
+        return int(n) < 3000001
+    if p.kind == "A1" and len(n) == 10:
+        return int(n) < 1979000329
+    return False
+
+
+def jplatpat_may_be_missing(p: PatentNumber | None) -> bool:
+    if p is None:
+        return False
+    if p.country == "JP":
+        return _jp_may_be_missing(p)
+    kind, n = p.kind[0], p.number
+    stored = JPLATPAT_STORED_KINDS.get(p.country)
+    if stored is not None and kind not in stored:
+        return True
+    series = len(n)
+    if p.country == "KR" and len(n) in (9, 10, 11) and n[:2] in ("19", "20"):
+        if kind == "Y":
+            # J-PlatPat stores KR Y1 only by registration number.
+            return True
+        n, series = n[:4] + n[4:].zfill(7), "year"
+    oldest = JPLATPAT_OLDEST.get((p.country, kind, series)) or JPLATPAT_OLDEST.get((p.country, kind, None))
+    return oldest is not None and int(n) < oldest
+
+
 def build_links(values) -> list[tuple[str | None, str | None]]:
     links = []
     for v in values:
@@ -220,8 +290,9 @@ def add_links_to_workbook(
     header_cell = ws.cell(row=header_row, column=src_col)
     esp_col = ws.max_column + 1
     jpp_col = esp_col + 1
+    note_col = jpp_col + 1
 
-    for col, title in ((esp_col, "Espacenet"), (jpp_col, "J-PlatPat")):
+    for col, title in ((esp_col, "Espacenet"), (jpp_col, "J-PlatPat"), (note_col, "J-PlatPat 注意")):
         cell = ws.cell(row=header_row, column=col, value=title)
         font = copy(header_cell.font)
         font.name = "Meiryo UI"
@@ -253,6 +324,13 @@ def add_links_to_workbook(
             alignment = copy(cell.alignment)
             alignment.vertical = "top"
             cell.alignment = alignment
+
+        note = JPLATPAT_NOTE if jplatpat_may_be_missing(p) else None
+        cell = ws.cell(row=row, column=note_col, value=note)
+        cell.font = Font(name="Meiryo UI", size=10, color="C00000" if note else None)
+        alignment = copy(cell.alignment)
+        alignment.vertical = "top"
+        cell.alignment = alignment
 
     wb.calculation.fullCalcOnLoad = True
     out = BytesIO()

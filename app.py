@@ -7,7 +7,7 @@ import streamlit as st
 
 from openpyxl import Workbook, load_workbook
 
-from patent_links import add_links_to_workbook, build_links, parse_number
+from patent_links import JPLATPAT_NOTE, add_links_to_workbook, build_links, jplatpat_may_be_missing, parse_number
 
 st.set_page_config(page_title="公報番号リンク作成", page_icon=":material/link:", layout="wide")
 
@@ -52,11 +52,13 @@ def build_text_output(numbers: tuple[str, ...], link_rules_signature: str) -> by
 
 def show_result(values: pd.Series, column: str) -> None:
     links = build_links(values)
+    notes = [JPLATPAT_NOTE if jplatpat_may_be_missing(parse_number(v)) else None for v in values]
     result = pd.DataFrame(
         {
             column: values,
             "Espacenet": [espacenet for espacenet, _ in links],
             "J-PlatPat": [jplatpat for _, jplatpat in links],
+            "J-PlatPat 注意": notes,
         }
     )
 
@@ -68,6 +70,13 @@ def show_result(values: pd.Series, column: str) -> None:
     m1.metric("公報番号", total, border=True)
     m2.metric("解析失敗", unparsed, border=True)
     m3.metric("J-PlatPat 未対応", no_jpp, border=True)
+
+    flagged = [str(v) for v, note in zip(values, notes) if note]
+    if flagged:
+        st.warning(
+            "次の番号は、J-PlatPatの蓄積範囲外の可能性があります。\n\n" + "、".join(flagged),
+            icon=":material/warning:",
+        )
 
     st.dataframe(
         result,
@@ -99,6 +108,7 @@ st.markdown(
 | J-PlatPat（日本） | 公開・公表公報（A）は種別`11`、通常の特許登録公報（B/B1/B2）は`15`で照会します。特公昭の8桁および先頭が0以外の7桁B1/B2は、元号・年・6桁通番の形式で種別`12`を指定します（例: JP46012531B2 → JP-S46-012531/12/ja、JP7013126B1 → JP-H07-013126/12/ja）。7桁B1/B2のうちJP10から始まる番号は、J-PlatPatではすべてH01にします。 |
 | J-PlatPat（外国） | WO（A）、US（A/B）、EP（A/B。A1/A2の4〜7桁は9桁に0埋め（例: EP6042A1 → EP-A-000006042、EP3086489A1 → EP-A-003086489））、CN（A/B/C/U/Y。A/Yの7桁番号は9桁に0埋め（例: CN1536611A → CN-A-001536611、CN2891917Y → CN-Y-002891917））、KR（A/B/U/Y。KR-Bは7桁以下を9桁に0埋め（例: KR990264B1 → KR-B-000990264、KR13B1 → KR-B-000000013）、KR199513437B1 → KR-B-950013437、KR-Uは例: KR201405583U → KR-U-140005583、KR-Y1は例: KR485463Y1 → KR-Y-000485463）、GB・DE・DD・FR・CH・CAにリンクを作成します。外国公報の種別コードは`50`です。 |
 | J-PlatPat（対象外） | 上記以外の国・種別（例: TW）はリンク欄を空欄にします。 |
+| J-PlatPat（注意） | J-PlatPatの文献蓄積情報（2026年10月時点）の最古の番号より古い番号や、蓄積されていない種別・形式（例: KR199600937Y1、GBのB公報）は、「J-PlatPat 注意」列に「蓄積範囲外の可能性」と表示します。リンクは作成されます。 |
 
 リンクは各サービスの照会画面を開きます。対象文献がデータベースに収録されていない場合、検索結果が表示されないことがあります。
 """
