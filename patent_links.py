@@ -41,7 +41,11 @@ def parse_number(raw) -> PatentNumber | None:
     m = _PATTERN.match(text)
     if not m:
         return None
-    return PatentNumber(*m.groups())
+    country, number, kind = m.groups()
+    if country == "JP" and kind == "K1":
+        # JP K1 follows the same conversion rules as A.
+        kind = "A"
+    return PatentNumber(country, number, kind)
 
 
 def _is_granted(p: PatentNumber) -> bool:
