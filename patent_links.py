@@ -154,7 +154,7 @@ def espacenet_number(p: PatentNumber) -> str:
         number = number[:4] + number[4:].zfill(7)
     elif p.country == "EP" and p.kind in ("A1", "A2") and len(number) in (4, 5):
         number = number.zfill(7)
-    elif p.country == "CN" and p.kind == "A" and len(number) == 10 and number[:2] in ("19", "20"):
+    elif p.country == "CN" and p.kind in ("A", "B") and len(number) == 10 and number[:2] in ("19", "20"):
         number = number[2:]
     elif p.country == "US" and p.kind.startswith("A") and len(number) == 11:
         # Espacenet (DOCDB) uses a 6-digit serial: US2016222235A1, not US20160222235A1.
@@ -182,9 +182,9 @@ def _jplatpat_foreign_id(p: PatentNumber) -> str | None:
             return f"US-B-{n.zfill(9)}"
     if p.country == "EP" and kind in "AB":
         return f"EP-{kind}-{n.zfill(9)}"
-    if p.country == "CN" and kind == "A" and len(n) == 10 and n[:2] in ("19", "20"):
-        return f"CN-A-0{n[2:]}"
-    if p.country == "CN" and kind in "AY" and len(n) == 7:
+    if p.country == "CN" and kind in "AB" and len(n) == 10 and n[:2] in ("19", "20"):
+        return f"CN-{kind}-0{n[2:]}"
+    if p.country == "CN" and kind in "ABCUY" and len(n) == 7:
         return f"CN-{kind}-{n.zfill(9)}"
     if p.country == "CN" and kind in "ABCUY":
         return f"CN-{kind}-{n}"
@@ -222,6 +222,8 @@ def jplatpat_url(p: PatentNumber | None) -> str | None:
             else:
                 code = {"A": "11", "B": "12", "Y": "22"}[group]
             return f"{JPLATPAT_BASE}/JP-{era}{year}-{serial}/{code}/ja"
+        if p.kind.startswith("C"):
+            return f"{JPLATPAT_BASE}/JP-{n.lstrip('0')}/15/ja"
         if _is_granted(p):
             return f"{JPLATPAT_BASE}/JP-{p.number.lstrip('0').zfill(7)}/15/ja"
         if p.kind.startswith(("U", "Y")) and len(n) == 8:
