@@ -137,7 +137,7 @@ def espacenet_number(p: PatentNumber) -> str:
         # JP A1 = 再公表特許; Espacenet uses JPWO only from 2003, earlier ones are found as WO.
         prefix = "JPWO" if number[:4] > "2002" else "WO"
         return f"{prefix}{number}{p.kind}"
-    if p.country == "JP" and p.kind == "U" and len(number) == 8:
+    if p.country == "JP" and p.kind.startswith(("U", "Y")) and len(number) == 8:
         number = number.lstrip("0")
     elif p.country == "JP" and _is_granted(p):
         number = number.lstrip("0")
@@ -174,7 +174,7 @@ def _jplatpat_foreign_id(p: PatentNumber) -> str | None:
     if p.country == "WO" and kind == "A" and len(n) == 10:
         return f"WO-A-{n[:4]}-{n[4:]}"
     if p.country == "US":
-        if kind == "A" and len(n) == 7:
+        if kind == "A" and len(n) <= 7:
             return f"US-A-{n.zfill(9)}"
         if kind == "A" and len(n) == 11:
             return f"US-A-{n[:4]}-{n[4:]}"
@@ -226,7 +226,7 @@ def jplatpat_url(p: PatentNumber | None) -> str | None:
             return f"{JPLATPAT_BASE}/JP-{era}{year}-{serial}/{code}/ja"
         if _is_granted(p):
             return f"{JPLATPAT_BASE}/JP-{p.number.lstrip('0').zfill(7)}/15/ja"
-        if p.kind == "U" and len(n) == 8:
+        if p.kind.startswith(("U", "Y")) and len(n) == 8:
             return f"{JPLATPAT_BASE}/JP-{n.lstrip('0')}/25/ja"
         if p.kind == "A1" and len(n) == 10:
             return f"{JPLATPAT_BASE}/JP-{n[:4]}-{n[4:]}/19/ja"
@@ -250,6 +250,8 @@ def _jp_may_be_missing(p: PatentNumber) -> bool:
         return int(n) < 2500001
     if p.kind == "U" and len(n) == 8:
         return int(n) < 3000001
+    if p.kind.startswith("Y") and len(n) == 8:
+        return int(n) < 2500001
     if p.kind == "A1" and len(n) == 10:
         return int(n) < 1979000329
     return False
